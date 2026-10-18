@@ -7,7 +7,7 @@ struct SetupView: View {
         ScrollView {
             VStack(spacing: 22) {
                 HStack {
-                    BackButton(title: "Menu", action: model.showMenu)
+                    BackButton(title: model.isVersusMatch ? "Leave" : "Menu", action: model.showMenu)
                     Spacer()
                 }
                 header
@@ -37,24 +37,40 @@ struct SetupView: View {
     private var header: some View {
         VStack(spacing: 6) {
             HStack(spacing: 4) {
-                OutlinedText("BALL", size: 46, fill: PlayerSlot.one.color, outline: 4)
-                    .rotationEffect(.degrees(-4))
-                OutlinedText("BRAWL!", size: 46, fill: PlayerSlot.two.color, outline: 4)
-                    .rotationEffect(.degrees(3))
+                OutlinedText("BALL", size: 44, fill: .white, outline: 4)
+                    .fixedSize()
+                OutlinedText("BRAWL", size: 44, fill: Theme.yellow, outline: 4)
+                    .fixedSize()
             }
-            Text("Pick a fighter, lock in, and watch them battle!")
+            Text(model.isVersusMatch
+                 ? (model.isRankedMatch ? String(localized: "Ranked vs \(model.opponentName). Lock in to fight!")
+                                        : String(localized: "Casual vs \(model.opponentName). Lock in to fight!"))
+                 : String(localized: "Pick a fighter, lock in, and watch them battle!"))
                 .font(Theme.bodyFont(14, weight: .heavy))
                 .foregroundStyle(.white.opacity(0.85))
         }
     }
 
-    private var startButton: some View {
+    @ViewBuilder private var startButton: some View {
+        if model.isVersusMatch {
+            // The host starts automatically once both players are locked in.
+            let ready = model.players[model.localSlot.rawValue].isReady
+            Text(ready ? String(localized: "WAITING FOR \(model.opponentName.uppercased())…") : String(localized: "LOCK IN WHEN YOU'RE READY"))
+                .font(Theme.bodyFont(16, weight: .black))
+                .foregroundStyle(.white)
+                .padding(.vertical, 8)
+        } else {
+            localStartButton
+        }
+    }
+
+    private var localStartButton: some View {
         Button {
             model.startBattle()
         } label: {
             HStack(spacing: 10) {
                 if model.canStart { Image(systemName: "bolt.fill") }
-                Text(model.canStart ? "START BATTLE!" : "WAITING FOR BOTH PLAYERS")
+                Text(model.canStart ? String(localized: "START BATTLE!") : String(localized: "WAITING FOR BOTH PLAYERS"))
             }
         }
         .buttonStyle(CartoonButtonStyle(fill: Theme.yellow, fontSize: model.canStart ? 24 : 16, cornerRadius: 20))
@@ -72,11 +88,17 @@ private struct PlayerSetupPanel: View {
     let slot: PlayerSlot
 
     private var player: PlayerSetup { model.players[slot.rawValue] }
+    /// The opponent's panel in an online match: shown, but not editable here.
+    private var isRemote: Bool { !model.controlledSlots.contains(slot) }
+    private var title: String {
+        guard model.isVersusMatch else { return slot.title.localized }
+        return isRemote ? model.opponentName : model.playerDisplayName
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                OutlinedText(slot.title.uppercased(), size: 22, fill: .white, outline: 2.5)
+                OutlinedText(title.uppercased(), size: 22, fill: .white, outline: 2.5)
                 Spacer()
                 statusChip
             }
@@ -85,25 +107,25 @@ private struct PlayerSetupPanel: View {
             .cartoonCard(fill: slot.color, cornerRadius: 14, shadow: 0)
 
             // Compact roster grid; full details only for the selected fighter.
-            if !player.isReady {
+            if !player.isReady && !isRemote {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 8)], spacing: 10) {
-                    ForEach(FighterCatalog.all) { def in
+                    ForEach(model.profile.unlockedRoster) { def in
                         rosterTile(def, selected: player.fighterID == def.id)
                     }
                 }
             }
 
-            if let fighter = player.fighter {
+            if let fighter = model.definition(for: slot) {
                 FighterCardView(definition: fighter, slot: slot, isSelected: true, isLocked: player.isReady) {}
-                if fighter.requiresAim && !player.isReady {
+                if fighter.requiresAim && !player.isReady && !isRemote {
                     AimPickerView(definition: fighter, slot: slot, angle: Binding(
                         get: { model.players[slot.rawValue].aimAngle },
                         set: { model.setAim($0, for: slot) }
                     ))
                 }
-                lockButton(for: fighter)
+                if !isRemote { lockButton(for: fighter) }
             } else {
-                Text("Tap a fighter to choose it!")
+                Text(isRemote ? String(localized: "Choosing a fighter…") : String(localized: "Tap a fighter to choose it!"))
                     .font(Theme.bodyFont(14, weight: .heavy))
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity)
@@ -121,6 +143,7 @@ private struct PlayerSetupPanel: View {
         } label: {
             VStack(spacing: 2) {
                 FighterPortrait(definition: def, color: slot.color, size: 54, expression: selected ? .happy : .normal)
+                    .overlay(alignment: .bottomTrailing) { LevelBadge(level: model.profile.level(of: def.id), size: 8).offset(x: 6) }
                 Text(def.name)
                     .font(Theme.bodyFont(11, weight: .black))
                     .foregroundStyle(Theme.ink)
@@ -128,7 +151,8 @@ private struct PlayerSetupPanel: View {
             }
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity)
-            .cartoonCard(fill: selected ? slot.lightColor : .white, cornerRadius: 14, shadow: selected ? 1 : 4, lineWidth: 2.5)
+            .cartoonCard(fill: selected ? slot.lightColor : def.rarity.color.mix(with: .white, by: 0.75),
+                         cornerRadius: 14, shadow: selected ? 1 : 4, lineWidth: 2.5)
             .offset(y: selected ? 3 : 0)
         }
         .buttonStyle(.plain)
@@ -136,13 +160,12 @@ private struct PlayerSetupPanel: View {
     }
 
     private var statusChip: some View {
-        let text = player.isReady ? "READY!" : (player.fighter == nil ? "CHOOSING" : "SETTING UP")
+        let text = player.isReady ? String(localized: "READY!") : (player.fighter == nil ? String(localized: "CHOOSING") : String(localized: "SETTING UP"))
         return Text(text)
             .font(Theme.bodyFont(12, weight: .black))
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .cartoonCard(fill: player.isReady ? Theme.yellow : .white, cornerRadius: 10, shadow: 0, lineWidth: 2.5)
-            .rotationEffect(.degrees(player.isReady ? -4 : 0))
     }
 
     private func lockButton(for fighter: FighterDefinition) -> some View {
@@ -151,7 +174,7 @@ private struct PlayerSetupPanel: View {
         } label: {
             HStack {
                 Image(systemName: player.isReady ? "pencil" : "checkmark.circle.fill")
-                Text(player.isReady ? "Edit Setup" : (fighter.requiresAim ? "Confirm Aim" : "Lock In \(fighter.name)"))
+                Text(player.isReady ? String(localized: "Edit Setup") : (fighter.requiresAim ? String(localized: "Confirm Aim") : String(localized: "Lock In \(fighter.name)")))
             }
         }
         .buttonStyle(CartoonButtonStyle(fill: player.isReady ? .white : slot.color,
@@ -172,20 +195,24 @@ struct FighterCardView: View {
         Button(action: onSelect) {
             HStack(alignment: .top, spacing: 12) {
                 FighterPortrait(definition: definition, color: slot.color, size: 70, expression: isSelected ? .happy : .normal)
-                    .rotationEffect(.degrees(isSelected ? -8 : 0))
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(definition.name).font(Theme.titleFont(21)).foregroundStyle(Theme.ink)
-                        Text(definition.tagline).font(Theme.bodyFont(11, weight: .heavy)).foregroundStyle(Theme.textSecondary)
+                        Text(definition.tagline.localized).font(Theme.bodyFont(11, weight: .heavy)).foregroundStyle(Theme.textSecondary)
                     }
-                    Text(definition.attackName.uppercased())
+                    HStack(spacing: 5) {
+                        RarityBadge(rarity: definition.rarity)
+                        LevelBadge(level: definition.level, size: 10)
+                        StarRow(level: definition.level, size: 10)
+                    }
+                    Text(definition.attackName.localized.uppercased())
                         .font(Theme.bodyFont(11, weight: .black))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(Capsule().fill(slot.color))
                         .overlay(Capsule().strokeBorder(Theme.ink, lineWidth: 2))
-                    Text(definition.attackDescription)
+                    Text(definition.attackDescription.localized)
                         .font(Theme.bodyFont(12, weight: .semibold))
                         .foregroundStyle(Theme.ink.opacity(0.8))
                         .fixedSize(horizontal: false, vertical: true)
@@ -207,9 +234,9 @@ struct FighterCardView: View {
         HStack(spacing: 5) {
             ForEach(definition.stats, id: \.label) { stat in
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(stat.value).font(Theme.bodyFont(13, weight: .black)).foregroundStyle(Theme.ink)
+                    Text(stat.value.localized).font(Theme.bodyFont(13, weight: .black)).foregroundStyle(Theme.ink)
                         .lineLimit(1).minimumScaleFactor(0.6)
-                    Text(stat.label).font(Theme.bodyFont(9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
+                    Text(stat.label.localized).font(Theme.bodyFont(9, weight: .heavy)).foregroundStyle(Theme.textSecondary)
                         .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 .padding(.horizontal, 6).padding(.vertical, 4)

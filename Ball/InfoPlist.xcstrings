@@ -1,0 +1,112 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        }
+      }
+    },
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Ball"
+          }
+        }
+      }
+    },
+    "NSGKFriendListUsageDescription": {
+      "comment": "Privacy - GameKit Friend List Usage Description",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Ball Brawl shows your Game Center friends so you can invite them to battle."
+          }
+        }
+      }
+    },
+    "NSUserTrackingUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "So passen Werbevideos, die du für Belohnungen anschaust, besser zu dir. Wenn du ablehnst, bekommst du trotzdem dieselben Belohnungen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Así los anuncios que eliges ver para ganar premios serán más relevantes para ti. Si dices que no, recibirás los mismos premios."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les pubs que tu choisis de regarder pour des récompenses seront plus adaptées à toi. Si tu refuses, tu reçois quand même les mêmes récompenses."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assim, os anúncios que você escolhe assistir para ganhar prêmios serão mais relevantes para você. Se disser não, você ganha os mesmos prêmios."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This lets ads you choose to watch for rewards be more relevant to you. You'll still get the same rewards if you say no."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Astfel, reclamele pe care alegi să le urmărești pentru recompense vor fi mai potrivite pentru tine. Dacă refuzi, primești aceleași recompense."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

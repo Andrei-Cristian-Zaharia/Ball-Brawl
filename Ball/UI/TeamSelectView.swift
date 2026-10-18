@@ -16,18 +16,19 @@ struct TeamSelectView: View {
                 }
 
                 VStack(spacing: 4) {
-                    OutlinedText("PICK YOUR TEAM", size: 32, fill: Theme.yellow, outline: 3.5)
-                        .rotationEffect(.degrees(-2))
-                    Text("Choose 3 fighters. The bot picks 3 at random.")
-                        .font(Theme.bodyFont(14, weight: .heavy))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .multilineTextAlignment(.center)
+                    ScreenTitle("PICK YOUR TEAM", subtitle: "Choose 3 fighters. The bot picks 3 at random.")
                 }
 
                 teamSlots
+                PresetPicker(profile: model.profile, isUnavailable: { !model.profile.isUnlocked($0) }) { preset in
+                    picks = Array(preset.filter(model.profile.isUnlocked).prefix(BotSeries.teamSize))
+                }
+                .padding(10)
+                .cartoonCard(fill: Theme.cream, cornerRadius: 18, shadow: 4, lineWidth: 3)
+                .frame(maxWidth: 520)
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 14) {
-                    ForEach(FighterCatalog.all) { fighter in
+                    ForEach(model.profile.unlockedRoster) { fighter in
                         pickCard(fighter)
                     }
                 }
@@ -37,7 +38,7 @@ struct TeamSelectView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
-                        Text(picks.count == BotSeries.teamSize ? "CONFIRM TEAM" : "PICK \(BotSeries.teamSize - picks.count) MORE")
+                        Text(picks.count == BotSeries.teamSize ? String(localized: "CONFIRM TEAM") : String(localized: "PICK \(BotSeries.teamSize - picks.count) MORE"))
                     }
                 }
                 .buttonStyle(CartoonButtonStyle(fill: Theme.yellow, fontSize: 22, cornerRadius: 20))
@@ -86,7 +87,11 @@ struct TeamSelectView: View {
                                     expression: selected ? .happy : .normal)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(fighter.name).font(Theme.titleFont(18)).foregroundStyle(Theme.ink)
-                        Text(fighter.attackName.uppercased())
+                        HStack(spacing: 4) {
+                            RarityBadge(rarity: fighter.rarity, size: 8)
+                            LevelBadge(level: model.profile.level(of: fighter.id), size: 9)
+                        }
+                        Text(fighter.attackName.localized.uppercased())
                             .font(Theme.bodyFont(10, weight: .black))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -95,7 +100,7 @@ struct TeamSelectView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                Text(fighter.attackDescription)
+                Text(fighter.attackDescription.localized)
                     .font(Theme.bodyFont(11, weight: .semibold))
                     .foregroundStyle(Theme.ink.opacity(0.75))
                     .lineLimit(4)
@@ -105,7 +110,8 @@ struct TeamSelectView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-            .cartoonCard(fill: selected ? PlayerSlot.one.lightColor : .white, cornerRadius: 16, shadow: selected ? 1 : 4)
+            .cartoonCard(fill: selected ? PlayerSlot.one.lightColor : fighter.rarity.color.mix(with: .white, by: 0.8),
+                         cornerRadius: 16, shadow: selected ? 1 : 4)
             .offset(y: selected ? 3 : 0)
             .overlay(alignment: .topTrailing) {
                 if let order {

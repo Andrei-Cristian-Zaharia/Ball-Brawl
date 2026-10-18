@@ -149,8 +149,15 @@ struct FighterDefinition: Identifiable, Equatable {
     let radius: Double
     let mass: Double
     let attack: AttackSpec
+    /// Progression level (see `Progression.leveled`); catalog entries are level 1 at common power.
+    var level = 1
+    /// Multiplier on all damage this fighter deals (rarity and level).
+    var damageScale = 1.0
+    /// Perk, side ability and Ultimate unlocked by star powers.
+    var abilities = BallAbilities()
 
     var requiresAim: Bool { attack.requiresAim }
+    var rarity: Rarity { Progression.rarity(of: id) }
 
     /// Furthest extent of the fighter's drawn body (spikes and legs stick out past the radius).
     var visualRadius: Double {

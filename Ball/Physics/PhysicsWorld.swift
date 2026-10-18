@@ -12,6 +12,8 @@ struct PhysicsBody {
     var ignoresSpeedLimit = false
     /// Locked in place but still solid: collides as an immovable object.
     var isFrozen = false
+    /// Scales the min/max speed limits for this body (Snake is faster).
+    var speedScale = 1.0
 
     init(position: Vec2, radius: Double, mass: Double) {
         self.position = position
@@ -180,15 +182,17 @@ struct PhysicsWorld {
         for i in bodies.indices where !bodies[i].isKinematic && !bodies[i].isFrozen {
             let v = bodies[i].velocity
             let speed = v.length
-            if speed > settings.maxSpeed && !bodies[i].ignoresSpeedLimit {
-                bodies[i].velocity = v * (settings.maxSpeed / speed)
-            } else if speed < settings.minSpeed {
+            let maxSpeed = settings.maxSpeed * bodies[i].speedScale
+            let minSpeed = settings.minSpeed * bodies[i].speedScale
+            if speed > maxSpeed && !bodies[i].ignoresSpeedLimit {
+                bodies[i].velocity = v * (maxSpeed / speed)
+            } else if speed < minSpeed {
                 // A stalled ball heads away from the arena center.
                 let direction = speed > 1e-6
                     ? v / speed
                     : (bodies[i].position - Vec2(width / 2, height / 2)).normalized
                 let fallback = direction == .zero ? Vec2(1, 0) : direction
-                bodies[i].velocity = fallback * settings.minSpeed
+                bodies[i].velocity = fallback * minSpeed
             }
         }
     }

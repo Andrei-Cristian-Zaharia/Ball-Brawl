@@ -25,6 +25,7 @@ struct EffectsState {
         let maxLife: Double
         let text: String
         let tint: Tint
+        var size: Double = 24
     }
 
     /// Comic "POW" starbursts at hit points.
@@ -97,8 +98,11 @@ struct EffectsState {
                                 rotation: Double.random(in: 0..<(2 * .pi)), tint: tint))
     }
 
-    mutating func addText(_ text: String, at point: Vec2, tint: Tint) {
-        texts.append(FloatingText(position: point, life: 0.8, maxLife: 0.8, text: text, tint: tint))
+    mutating func addText(_ text: String, at point: Vec2, tint: Tint, size: Double = 24, life: Double = 0.8) {
+        // Keep long callouts inside the arena (roughly half the text's width from each side wall).
+        let half = min(GameConfig.arenaWidth / 2 - 4, Double(text.count) * size * 0.34)
+        let x = min(max(point.x, half + 4), GameConfig.arenaWidth - half - 4)
+        texts.append(FloatingText(position: Vec2(x, point.y), life: life, maxLife: life, text: text, tint: tint, size: size))
     }
 
     /// Translates gameplay events into visuals.
@@ -205,6 +209,14 @@ struct EffectsState {
                 addShake(0.7)
             }
             addText("-\(Int(hit.amount.rounded()))", at: hit.point + Vec2(0, -14), tint: .white)
+        case .ability(let slot, let name, let position, let ultimate):
+            addText(ultimate ? "\(name.localized.uppercased())!" : name.localized.uppercased(), at: position + Vec2(0, -58),
+                    tint: ultimate ? .spark : .player(slot), size: ultimate ? 30 : 20, life: ultimate ? 1.3 : 0.9)
+            burst(at: position, count: ultimate ? 26 : 10, tint: .spark, speed: 100...320, life: 0.3...0.7, size: 3...5)
+            if ultimate {
+                addStar(at: position, size: 56, tint: .spark)
+                addShake(0.45)
+            }
         case .defeated(let slot, let position):
             burst(at: position, count: 40, tint: .player(slot), speed: 120...420, life: 0.5...1.1, size: 3...6)
             burst(at: position, count: 14, tint: .spark, speed: 80...260, life: 0.3...0.7, size: 3...5)

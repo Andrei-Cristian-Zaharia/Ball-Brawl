@@ -28,16 +28,26 @@ final class BattleEngine {
     private static let slowMotionRate = 0.3
 
     private(set) var isPaused = false
+    /// Held still while the VS intro plays; the countdown starts once it ends.
+    private(set) var isIntroPlaying = true
     private(set) var outcome: BattleOutcome?
 
-    init(setup: MatchSetup, seed: UInt64 = UInt64.random(in: .min ... .max)) {
+    let seed: UInt64
+    /// Online: the slot this device locks when its countdown ends; the opponent's lock arrives over the network.
+    @ObservationIgnored let onlineSlot: PlayerSlot?
+    @ObservationIgnored var onLaunchLocked: ((Double) -> Void)?
+
+    init(setup: MatchSetup, seed: UInt64 = UInt64.random(in: .min ... .max), onlineSlot: PlayerSlot? = nil) {
         self.setup = setup
+        self.seed = seed
+        self.onlineSlot = onlineSlot
         self.simulation = BattleSimulation(setup: setup, seed: seed)
+        simulation.waitsForLaunchLock = onlineSlot != nil
     }
 
     /// Called once per display frame.
     func tick(_ date: Date) {
-        guard !isPaused else { lastDate = nil; return }
+        guard !isPaused, !isIntroPlaying else { lastDate = nil; return }
         guard let last = lastDate else { lastDate = date; return }
         lastDate = date
 
@@ -57,6 +67,12 @@ final class BattleEngine {
             accumulator -= dt
         }
         interpolation = accumulator / dt
+
+        if let onlineSlot, simulation.isWaitingForLaunchLock, !simulation.lockedSlots.contains(onlineSlot) {
+            let angle = simulation.launchVelocities[onlineSlot.rawValue].angle
+            simulation.lockLaunch(onlineSlot, angle: angle)
+            onLaunchLocked?(angle)
+        }
 
         let events = simulation.drainEvents()
         for event in events {
@@ -83,7 +99,12 @@ final class BattleEngine {
         }
     }
 
-    var canPause: Bool { outcome == nil }
+    var canPause: Bool { outcome == nil && !isIntroPlaying }
+
+    func finishIntro() {
+        isIntroPlaying = false
+        lastDate = nil
+    }
 
     func setPaused(_ paused: Bool) {
         guard canPause || !paused else { return }
@@ -102,11 +123,13 @@ private final class Haptics {
 
     func play(_ events: [BattleEvent]) {
         #if os(iOS)
+        guard GameSettings.vibrationEnabled else { return }
         for event in events {
             switch event {
             case .damage: light.impactOccurred(intensity: 0.8)
             case .launched: heavy.impactOccurred(intensity: 0.6)
             case .defeated: notify.notificationOccurred(.success)
+            case .ability(_, _, _, true): heavy.impactOccurred(intensity: 1)
             case .overtimeStarted: notify.notificationOccurred(.warning)
             default: break
             }

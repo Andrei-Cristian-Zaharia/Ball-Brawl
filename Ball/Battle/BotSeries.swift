@@ -36,11 +36,21 @@ struct BotSeries {
     /// Bot swaps out a survivor below this health fraction if a healthier teammate is available.
     private static let botSwapThreshold = 0.35
 
-    init(playerTeam: [FighterDefinition], seed: UInt64 = UInt64.random(in: .min ... .max)) {
+    /// `playerTeam` should already be leveled; the bot's random team is leveled to `botLevel`.
+    init(playerTeam: [FighterDefinition], botLevel: Int = 1, pool: [FighterDefinition] = FighterCatalog.all,
+         seed: UInt64 = UInt64.random(in: .min ... .max)) {
         rng = SplitMix64(seed: seed)
         player = playerTeam.enumerated().map { TeamMember(id: $0.offset, definition: $0.element, health: $0.element.maxHealth) }
-        let botTeam = Array(FighterCatalog.all.shuffled(using: &rng).prefix(Self.teamSize))
+        let botPool = pool.count >= Self.teamSize ? pool : FighterCatalog.all
+        let botTeam = botPool.shuffled(using: &rng).prefix(Self.teamSize).map { Progression.leveled($0, level: botLevel) }
         bot = botTeam.enumerated().map { TeamMember(id: $0.offset, definition: $0.element, health: $0.element.maxHealth) }
+    }
+
+    /// A series against a known team (an online opponent's, or a stand-in's). Both should be leveled.
+    init(playerTeam: [FighterDefinition], opponentTeam: [FighterDefinition], seed: UInt64 = UInt64.random(in: .min ... .max)) {
+        rng = SplitMix64(seed: seed)
+        player = playerTeam.enumerated().map { TeamMember(id: $0.offset, definition: $0.element, health: $0.element.maxHealth) }
+        bot = opponentTeam.enumerated().map { TeamMember(id: $0.offset, definition: $0.element, health: $0.element.maxHealth) }
     }
 
     var outcome: Outcome? {

@@ -46,7 +46,7 @@ enum FighterArt {
     ) {
         let s = r / CGFloat(definition.radius)
         let ink = Theme.ink
-        let outline = 3.5 * s
+        let outline = 4.2 * s
         let body = circle(center, r)
         let p = Palette(team: color)
 
@@ -57,19 +57,30 @@ enum FighterArt {
         drawBackParts(definition, in: &context, center: center, r: r, s: s, p: p, spin: spin, aimAngle: aimAngle,
                       coverage: coverage, outline: outline)
 
-        // Body: flat color with a crescent shade.
-        context.fill(body, with: .color(p.shade))
+        // Body: shaded like a glossy sphere, lit from the top left, with a dark rim crescent.
+        context.fill(body, with: .radialGradient(
+            Gradient(stops: [.init(color: color.mix(with: .white, by: 0.45), location: 0),
+                             .init(color: color, location: 0.5),
+                             .init(color: p.shade, location: 1)]),
+            center: CGPoint(x: center.x - r * 0.35, y: center.y - r * 0.4), startRadius: 0, endRadius: r * 1.55))
         context.drawLayer { layer in
             layer.clip(to: body)
-            layer.fill(circle(CGPoint(x: center.x - r * 0.12, y: center.y - r * 0.14), r * 0.95), with: .color(color))
+            var rim = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+            rim.addEllipse(in: CGRect(x: center.x - r * 1.1, y: center.y - r * 1.16, width: r * 2.04, height: r * 2.04))
+            layer.fill(rim, with: .color(p.shade.opacity(0.55)), style: FillStyle(eoFill: true))
+            // Bounce light along the bottom edge.
+            layer.stroke(Path { path in
+                path.addArc(center: center, radius: r * 0.9, startAngle: .degrees(35), endAngle: .degrees(145), clockwise: false)
+            }, with: .color(.white.opacity(0.22)), style: StrokeStyle(lineWidth: r * 0.08, lineCap: .round))
         }
 
         drawSurface(definition, in: &context, center: center, r: r, s: s, p: p, spin: spin, coverage: coverage, body: body)
 
-        // Glossy highlight.
-        context.fill(Path(ellipseIn: CGRect(x: center.x - r * 0.62, y: center.y - r * 0.7, width: r * 0.42, height: r * 0.26))
-                        .applying(rotation(-0.6, around: CGPoint(x: center.x - r * 0.41, y: center.y - r * 0.57))),
-                     with: .color(.white.opacity(0.85)))
+        // Glossy highlights: a big soft shine and a small hard sparkle.
+        context.fill(Path(ellipseIn: CGRect(x: center.x - r * 0.66, y: center.y - r * 0.74, width: r * 0.52, height: r * 0.32))
+                        .applying(rotation(-0.6, around: CGPoint(x: center.x - r * 0.4, y: center.y - r * 0.58))),
+                     with: .color(.white.opacity(0.75)))
+        context.fill(circle(CGPoint(x: center.x - r * 0.18, y: center.y - r * 0.72), r * 0.07), with: .color(.white.opacity(0.9)))
 
         drawFace(definition, in: &context, center: center, r: r, s: s, look: look, expression: expression)
 
@@ -301,6 +312,8 @@ enum FighterArt {
             case .traps, .turrets, .shock, .harpoon: face.angry = true
             case .bombs(let spec): face.angry = !spec.icy
             case .tail: face.fangs = true
+            case .wolf: face.fangs = true; face.angry = true
+            case .magma: face.angry = true
             default: break
             }
         default: break

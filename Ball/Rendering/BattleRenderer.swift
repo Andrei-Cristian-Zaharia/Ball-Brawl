@@ -7,14 +7,25 @@ enum BattleRenderer {
     private static let shadowDepth: CGFloat = 10
     private static let cornerRadius: CGFloat = 22
 
-    static func draw(_ sim: BattleSimulation, alpha: Double, in context: inout GraphicsContext, size: CGSize) {
+    /// Scale and top-left offset that fit the arena into a canvas of `size`.
+    private static func layout(for size: CGSize) -> (scale: CGFloat, origin: CGPoint) {
         let width = GameConfig.arenaWidth
         let height = GameConfig.arenaHeight
         let margin = borderWidth / 2 + 2
         let scale = min(size.width / (width + margin * 2), size.height / (height + margin * 2 + shadowDepth))
+        return (scale, CGPoint(x: (size.width - width * scale) / 2, y: (size.height - (height + shadowDepth) * scale) / 2))
+    }
+
+    /// Converts a point in the canvas (e.g. a touch) to arena coordinates.
+    static func arenaPoint(from point: CGPoint, canvasSize size: CGSize) -> Vec2 {
+        let (scale, origin) = layout(for: size)
+        return Vec2(Double((point.x - origin.x) / scale), Double((point.y - origin.y) / scale))
+    }
+
+    static func draw(_ sim: BattleSimulation, alpha: Double, in context: inout GraphicsContext, size: CGSize) {
+        let (scale, origin) = layout(for: size)
         let shake = sim.effects.shakeOffset
-        context.translateBy(x: (size.width - width * scale) / 2 + shake.x * scale,
-                            y: (size.height - (height + shadowDepth) * scale) / 2 + shake.y * scale)
+        context.translateBy(x: origin.x + shake.x * scale, y: origin.y + shake.y * scale)
         context.scaleBy(x: scale, y: scale)
 
         let state = sim.state
@@ -29,6 +40,10 @@ enum BattleRenderer {
                 ArsenalRenderer.drawHazard(hazard, in: &layer, time: state.battleTime, state: state)
             }
             for fighter in state.fighters where !fighter.isDefeated {
+                ArsenalRenderer.drawLaserAnchor(fighter, time: state.battleTime, in: &layer)
+                ArsenalRenderer.drawRewindGhost(fighter, time: state.battleTime, in: &layer)
+            }
+            for fighter in state.fighters where !fighter.isDefeated {
                 drawChessPlan(fighter, at: positions[fighter.slot.rawValue], in: &layer)
             }
             for fighter in state.fighters where !fighter.isDefeated {
@@ -41,8 +56,10 @@ enum BattleRenderer {
         for thread in state.threads { drawThread(thread, to: positions[thread.owner.rawValue], state: state, in: &context) }
         for fighter in state.fighters where !fighter.isDefeated {
             drawDrainTether(fighter, positions: positions, time: state.battleTime, in: &context)
+            drawBloodMoon(fighter, positions: positions, time: state.battleTime, in: &context)
             if case .arsenal(.tail(let spec)) = fighter.definition.attack {
-                ArsenalRenderer.drawTail(state.tails[fighter.slot.rawValue], segmentRadius: CGFloat(spec.segmentRadius),
+                ArsenalRenderer.drawTail(state.tails[fighter.slot.rawValue],
+                                         segmentRadius: CGFloat(spec.segmentRadius(segments: fighter.tailSegments)),
                                          color: fighter.slot.color, in: &context)
             }
         }
@@ -53,6 +70,22 @@ enum BattleRenderer {
             } else {
                 ArsenalRenderer.drawProjectile(projectile, at: projectile.previousPosition.lerp(to: projectile.position, alpha),
                                                in: &context, state: state)
+            }
+        }
+
+        // Extra balls (Twin's twin, Cell's small cells), under the fighters.
+        for minion in state.minions {
+            let body = state.world.bodies[minion.bodyIndex]
+            let fighter = state.fighter(minion.owner)
+            let at = body.previousPosition.lerp(to: body.position, alpha).cgPoint
+            let fade = minion.lifetime.isFinite ? min(1, max(0, (minion.lifetime - minion.age) / 0.6)) : 1
+            context.drawLayer { layer in
+                layer.opacity = fade
+                FighterArt.draw(fighter.definition, in: &layer, center: at, radius: CGFloat(body.radius), team: minion.owner.color,
+                                spin: fighter.spin * (minion.kind == .twin ? -1 : 1.5),
+                                look: CGVector(dx: positions[minion.owner.opponent.rawValue].x - at.x,
+                                               dy: positions[minion.owner.opponent.rawValue].y - at.y),
+                                expression: .normal)
             }
         }
 
@@ -86,8 +119,9 @@ enum BattleRenderer {
         let rect = CGRect(x: 0, y: 0, width: GameConfig.arenaWidth, height: GameConfig.arenaHeight)
         let frame = arenaPath
 
+        let map = sim.map
         context.fill(frame.offsetBy(dx: 0, dy: shadowDepth), with: .color(Theme.ink))
-        context.fill(frame, with: .color(Theme.cream))
+        context.fill(frame, with: .color(map.floor))
 
         // Checkerboard floor tiles (Gambit moves on these).
         context.drawLayer { layer in
@@ -107,15 +141,16 @@ enum BattleRenderer {
                 y += tile
                 row += 1
             }
-            layer.fill(tiles, with: .color(Theme.creamDark.opacity(0.6)))
+            layer.fill(tiles, with: .color(map.tile))
+            map.drawDecorations(in: &layer, size: rect.size, time: sim.elapsed)
         }
 
         let mid = CGPoint(x: rect.midX, y: rect.midY)
         var midline = Path()
         midline.move(to: CGPoint(x: 0, y: rect.midY))
         midline.addLine(to: CGPoint(x: rect.width, y: rect.midY))
-        context.stroke(midline, with: .color(Theme.ink.opacity(0.12)), style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [14, 14]))
-        context.stroke(FighterArt.circle(mid, 70), with: .color(Theme.ink.opacity(0.12)), lineWidth: 4)
+        context.stroke(midline, with: .color(map.marking), style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [14, 14]))
+        context.stroke(FighterArt.circle(mid, 70), with: .color(map.marking), lineWidth: 4)
 
         let borderColor: Color = sim.isOvertime && sin(sim.battleTime * 8) > 0 ? Theme.overtime : Theme.ink
         context.stroke(frame, with: .color(borderColor), lineWidth: borderWidth)
@@ -123,7 +158,7 @@ enum BattleRenderer {
         for corner in [CGPoint(x: 18, y: 18), CGPoint(x: rect.maxX - 18, y: 18),
                        CGPoint(x: 18, y: rect.maxY - 18), CGPoint(x: rect.maxX - 18, y: rect.maxY - 18)] {
             let bolt = FighterArt.circle(corner, 6)
-            context.fill(bolt, with: .color(Theme.yellow))
+            context.fill(bolt, with: .color(map.bolt))
             context.stroke(bolt, with: .color(Theme.ink), lineWidth: 2.5)
         }
     }
@@ -288,11 +323,12 @@ enum BattleRenderer {
                                     in context: inout GraphicsContext) {
         let def = fighter.definition
         let color = fighter.slot.color
-        let r = CGFloat(def.radius)
+        let body = state.world.bodies[fighter.bodyIndex]
+        // The body's own size (a growing Cell is bigger than its definition).
+        let r = CGFloat(body.radius)
         let look = CGVector(dx: target.x - center.x, dy: target.y - center.y)
         var aim = def.requiresAim ? fighter.aim.angle : nil
         if case .swinging = fighter.grabPhase { aim = atan2(look.dy, look.dx) }
-        let body = state.world.bodies[fighter.bodyIndex]
         // Held, thrown or frozen by the opponent (a Gambit is kinematic during its own move, which doesn't count).
         let manhandled = (body.isKinematic && fighter.chessPhase == .idle) || body.ignoresSpeedLimit || body.isFrozen
         var drawRadius = r
@@ -347,6 +383,7 @@ enum BattleRenderer {
             let ready = fighter.attackCharge >= 1
             context.stroke(arc, with: .color(ready ? Theme.ink : color.mix(with: Theme.ink, by: 0.15)),
                            style: StrokeStyle(lineWidth: 5, lineCap: .round))
+            if def.abilities.ultimate != nil { drawUltimateMeter(fighter, at: center, radius: ringRadius + 7, time: state.battleTime, in: &context) }
         }
 
         switch fighter.chessPhase {
@@ -360,8 +397,37 @@ enum BattleRenderer {
                          at: CGPoint(x: bubbleCenter.x, y: bubbleCenter.y + 1))
         case .idle:
             CartoonText.draw(label, size: 17, fill: color, outline: 2.5,
-                             at: CGPoint(x: center.x, y: center.y - ringRadius - 16), in: &context)
+                             at: CGPoint(x: center.x, y: center.y - ringRadius - 16), maxWidth: 150, in: &context)
         }
+    }
+
+    /// Thin gold arc for the Ultimate meter; a pulsing golden aura while it's active.
+    private static func drawUltimateMeter(_ fighter: FighterState, at center: CGPoint, radius: CGFloat, time: Double,
+                                          in context: inout GraphicsContext) {
+        let gold = Rarity.legendary.color
+        if fighter.isUltimateActive {
+            let pulse = CGFloat(0.5 + 0.5 * sin(time * 14))
+            context.fill(FighterArt.circle(center, radius + 4 + 3 * pulse), with: .color(gold.opacity(0.18 + 0.12 * Double(pulse))))
+            context.stroke(FighterArt.circle(center, radius + 2 * pulse), with: .color(gold), lineWidth: 4)
+            return
+        }
+        guard fighter.ultimateCharge > 0 else { return }
+        var arc = Path()
+        arc.addArc(center: center, radius: radius, startAngle: .degrees(-90),
+                   endAngle: .degrees(-90 + 360 * fighter.ultimateCharge), clockwise: false)
+        context.stroke(arc, with: .color(Theme.ink.opacity(0.6)), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+        context.stroke(arc, with: .color(gold), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+    }
+
+    /// Blood Moon: a pulsing red tether to the enemy, wherever it is.
+    private static func drawBloodMoon(_ fighter: FighterState, positions: [CGPoint], time: Double, in context: inout GraphicsContext) {
+        guard fighter.isUltimateActive, case .bloodMoon = fighter.definition.abilities.ultimate else { return }
+        var line = Path()
+        line.move(to: positions[fighter.slot.rawValue])
+        line.addLine(to: positions[fighter.slot.opponent.rawValue])
+        context.stroke(line, with: .color(Theme.ink.opacity(0.5)), style: StrokeStyle(lineWidth: 7, lineCap: .round))
+        context.stroke(line, with: .color(Color(red: 0.85, green: 0.05, blue: 0.15)),
+                       style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [10, 6], dashPhase: -time * 60))
     }
 
     // MARK: Effects & banners
@@ -388,14 +454,30 @@ enum BattleRenderer {
             let t = max(0, text.life / text.maxLife)
             context.drawLayer { layer in
                 layer.opacity = min(1, t * 1.8)
-                CartoonText.draw(text.text, size: 24, fill: text.tint.color, outline: 2.5, at: text.position.cgPoint, in: &layer)
+                CartoonText.draw(text.text, size: CGFloat(text.size), fill: text.tint.color, outline: 2.5, at: text.position.cgPoint, in: &layer)
             }
         }
+    }
+
+    /// Countdown arrow showing which way a ball will launch.
+    private static func drawLaunchArrow(_ sim: BattleSimulation, _ slot: PlayerSlot, in context: inout GraphicsContext) {
+        let body = sim.state.body(of: slot)
+        let angle = sim.launchVelocities[slot.rawValue].angle
+        let bob = CGFloat(4 * sin(sim.elapsed * 8))
+        let arrow = FighterArt.arrow(from: FighterArt.point(body.position.cgPoint, CGFloat(body.radius) + 10 + bob, angle),
+                                     angle: angle, length: 70, headSize: 20)
+        context.stroke(arrow.shaft, with: .color(Theme.ink), style: StrokeStyle(lineWidth: 12, lineCap: .round))
+        context.stroke(arrow.head, with: .color(Theme.ink), style: StrokeStyle(lineWidth: 8, lineJoin: .round))
+        context.stroke(arrow.shaft, with: .color(slot.color), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+        context.fill(arrow.head, with: .color(slot.color))
     }
 
     private static func drawBanner(_ sim: BattleSimulation, in context: inout GraphicsContext) {
         let center = CGPoint(x: GameConfig.arenaWidth / 2, y: GameConfig.arenaHeight / 2)
         switch sim.phase {
+        case .countdown where sim.isWaitingForLaunchLock:
+            for slot in PlayerSlot.allCases { drawLaunchArrow(sim, slot, in: &context) }
+            CartoonText.draw("WAITING FOR RIVAL…", size: 30, fill: .white, outline: 3, at: center, in: &context)
         case .countdown:
             let remaining = sim.countdownRemaining
             let number = max(1, Int(remaining.rounded(.up)))
@@ -406,10 +488,13 @@ enum BattleRenderer {
                 layer.scaleBy(x: bounce, y: bounce)
                 CartoonText.draw("\(number)", size: 140, fill: Theme.yellow, outline: 6, at: .zero, in: &layer)
             }
-            CartoonText.draw("GET READY!", size: 28, fill: .white, outline: 3,
+            for slot in PlayerSlot.allCases where sim.steerableSlots.contains(slot) {
+                drawLaunchArrow(sim, slot, in: &context)
+            }
+            CartoonText.draw(sim.steerableSlots.isEmpty ? "GET READY!" : "DRAG TO AIM!", size: 28, fill: .white, outline: 3,
                              at: CGPoint(x: center.x, y: center.y + 110), in: &context)
         case .fighting:
-            if sim.battleTime < 0.8 {
+            if sim.battleTime < 0.8 && !sim.isPreview {
                 let t = sim.battleTime / 0.8
                 let wobble = 1 + 0.25 * sin(t * .pi)
                 context.drawLayer { layer in
@@ -424,7 +509,7 @@ enum BattleRenderer {
                 }
             }
             if sim.isOvertime {
-                let label = String(format: "OVERTIME ×%.1f", sim.state.damageMultiplier)
+                let label = String(localized: "OVERTIME ×\(sim.state.damageMultiplier.formatted(.number.precision(.fractionLength(1))))")
                 let pill = Path(roundedRect: CGRect(x: center.x - 130, y: 22, width: 260, height: 44), cornerRadius: 22)
                 context.fill(pill.offsetBy(dx: 0, dy: 5), with: .color(Theme.ink))
                 context.fill(pill, with: .color(Theme.overtime))
@@ -476,7 +561,7 @@ enum BattleHUDRenderer {
                         .font(.system(size: 24, weight: .black, design: .rounded).monospacedDigit())
                         .foregroundStyle(Theme.ink),
                      at: CGPoint(x: rect.midX, y: rect.minY + 24))
-        context.draw(Text(overtime ? String(format: "OT ×%.1f", sim.state.damageMultiplier) : "TIME")
+        context.draw(Text(overtime ? String(localized: "OT ×\(sim.state.damageMultiplier.formatted(.number.precision(.fractionLength(1))))") : String(localized: "TIME"))
                         .font(Theme.bodyFont(11, weight: .black))
                         .foregroundStyle(Theme.ink.opacity(overtime ? 1 : 0.6)),
                      at: CGPoint(x: rect.midX, y: rect.minY + 47))
@@ -489,7 +574,8 @@ enum BattleHUDRenderer {
         let edgeX = leading ? rect.minX + 2 : rect.maxX - 2
 
         CartoonText.draw("\(label) \(fighter.definition.name.uppercased())", size: 16, fill: color,
-                         outline: 2.5, at: CGPoint(x: edgeX, y: rect.minY + 12), anchor: anchor, in: &context)
+                         outline: 2.5, at: CGPoint(x: edgeX, y: rect.minY + 12), anchor: anchor,
+                         maxWidth: rect.width - 4, in: &context)
 
         let bar = CGRect(x: rect.minX, y: rect.minY + 26, width: rect.width, height: 20)
         let maxHP = fighter.definition.maxHealth
@@ -539,31 +625,31 @@ enum BattleHUDRenderer {
 
         let status: String
         if fighter.isDefeated {
-            status = "K.O."
+            status = String(localized: "K.O.")
         } else {
             switch fighter.definition.attack {
             case .contact:
-                status = ready ? "ARMED!" : String(format: "%.1fs", fighter.secondsUntilReady)
+                status = ready ? String(localized: "ARMED!") : String(format: "%.1fs", fighter.secondsUntilReady)
             case .web(let spec):
-                status = "\(fighter.activeThreads)/\(spec.maxThreads) WEBS"
+                status = String(localized: "\(fighter.activeThreads)/\(spec.maxThreads) WEBS")
             case .grab:
                 switch fighter.grabPhase {
-                case .swinging: status = "SPIN!"
-                case .thrown: status = "THROW!"
-                case .idle: status = ready ? "READY!" : String(format: "%.1fs", fighter.secondsUntilReady)
+                case .swinging: status = String(localized: "SPIN!")
+                case .thrown: status = String(localized: "THROW!")
+                case .idle: status = ready ? String(localized: "READY!") : String(format: "%.1fs", fighter.secondsUntilReady)
                 }
             case .drain:
-                status = fighter.drainPhase != .idle ? "DRAIN!" : (ready ? "READY!" : String(format: "%.1fs", fighter.secondsUntilReady))
+                status = fighter.drainPhase != .idle ? String(localized: "DRAIN!") : (ready ? String(localized: "READY!") : String(format: "%.1fs", fighter.secondsUntilReady))
             case .chess:
                 switch fighter.chessPhase {
-                case .thinking(let move, _, _), .moving(let move, _, _, _): status = move.piece.name.uppercased() + "!"
+                case .thinking(let move, _, _), .moving(let move, _, _, _): status = move.piece.name.localized.uppercased() + "!"
                 case .idle: status = String(format: "%.1fs", fighter.secondsUntilReady)
                 }
             case .eclipse:
                 switch fighter.eclipsePhase {
                 case .waxing: status = "\(Int(fighter.eclipseCoverage * 100))%"
-                case .stalling: status = "ALMOST…"
-                case .totality: status = "TOTALITY!"
+                case .stalling: status = String(localized: "ALMOST…")
+                case .totality: status = String(localized: "TOTALITY!")
                 }
             case .projectile, .pulse:
                 status = String(format: "%.1fs", fighter.secondsUntilReady)
@@ -571,7 +657,7 @@ enum BattleHUDRenderer {
                 status = ArsenalRenderer.status(fighter, attack)
             }
         }
-        let line = Text("\(Text(fighter.definition.attackName.uppercased()).foregroundStyle(.white.opacity(0.75)))  \(Text(status).foregroundStyle(ready ? Theme.yellow : .white))")
+        let line = Text("\(Text(fighter.definition.attackName.localized.uppercased()).foregroundStyle(.white.opacity(0.75)))  \(Text(status).foregroundStyle(ready ? Theme.yellow : .white))")
         context.draw(line.font(Theme.bodyFont(11, weight: .black)),
                      at: CGPoint(x: edgeX, y: cd.maxY + 11), anchor: anchor)
     }

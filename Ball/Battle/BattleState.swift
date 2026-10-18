@@ -15,6 +15,10 @@ struct MatchSetup: Equatable {
     var loadouts: [FighterLoadout]
     /// Short names shown above the balls and in the HUD, indexed by slot.
     var labels: [String] = PlayerSlot.allCases.map(\.label)
+    /// Slots whose player may drag to pick a launch direction during the countdown (the bot can't).
+    var steerableSlots: Set<PlayerSlot> = Set(PlayerSlot.allCases)
+    /// Arena look (visual only).
+    var map: ArenaMap = .classic
 
     func loadout(for slot: PlayerSlot) -> FighterLoadout { loadouts[slot.rawValue] }
 }
@@ -158,8 +162,38 @@ struct FighterState {
     // Arsenal fighters and status effects.
     /// Snake tail length in segments.
     var tailSegments = 0
+    /// Laser: the last wall hit, waiting for a hit on another wall to link up with.
+    var laserAnchor: Vec2? = nil
+    /// Electric: charge stored from wall bounces.
+    var charge = 0
+    /// Zone: time toward the next self-heal tick.
+    var regenTick: Double = 0
+    /// Ice spike hits taken *by* this fighter toward being frozen; wears off after `chillRemaining`.
+    var chill = 0
+    var chillRemaining: Double = 0
     /// Harpoon: seconds left of dragging the opponent in.
     var dragRemaining: Double = 0
+    /// Fibonacci: index of the next hit's number in the sequence; Sequence (Ultimate) shots left at the top number.
+    var streak = 0
+    var maxedShots = 0
+    /// Wizard: the last spell cast (for Focus).
+    var lastSpell = -1
+    /// Damage absorbed before health (Mana Shield).
+    var shield: Double = 0
+    /// Moss: time until a wall bounce can heal again.
+    var healCooldown: Double = 0
+    /// Magma: time until its lava can burn again (one tick however many pools the enemy stands in).
+    var burnCooldown: Double = 0
+    /// Clockwork: where it was over the last few seconds (oldest first), sampled every `rewindSample`; and the rewind timer.
+    var history: [RewindPoint] = []
+    var historyTick: Double = 0
+    var rewindTimer: Double = 0
+    /// Can't go through another portal until this runs out (so it doesn't bounce straight back).
+    var portalCooldown: Double = 0
+    /// Cell: growth stage, time toward the next one, and whether its one split is used.
+    var cellStage = 0
+    var cellGrowth: Double = 0
+    var splitUsed = false
     /// Hazards this fighter currently owns (traps, lasers, dice…), for the HUD.
     var activeHazards = 0
     /// Poison applied *to* this fighter.
@@ -171,6 +205,32 @@ struct FighterState {
     var holdStyle: HoldStyle = .shock
     /// Velocity to restore when a hold ends.
     var heldVelocity: Vec2 = .zero
+
+    // Abilities (see `BallAbilities`).
+    /// Seconds toward the next side ability.
+    var sideTimer: Double = 0
+    /// Ultimate meter (0…1); it fires when full. `ultimateRemaining` > 0 while one is active.
+    var ultimateCharge: Double = 0
+    var ultimateRemaining: Double = 0
+    /// After an Ultimate ends, the meter doesn't fill for a moment (so one big burst can't chain into the next).
+    var ultimateLockout: Double = 0
+    /// Time toward the active Ultimate's next shot or tick, and Barrage's turning angle.
+    var ultimateTick: Double = 0
+    var barrageAngle: Double = 0
+    /// Wrecking Spree grabs left.
+    var spreeGrabs = 0
+    /// Snake's Shed Skin is once per fight.
+    var shedUsed = false
+    /// Time until the on-hit perk can trigger again.
+    var perkCooldown: Double = 0
+    /// Speed changes: slowed by a Flare, boosted by Shed Skin. `baseSpeedScale` is the ball's own.
+    var baseSpeedScale = 1.0
+    var slowRemaining: Double = 0
+    var slowAmount: Double = 0
+    var boostRemaining: Double = 0
+    var boostAmount = 1.0
+
+    var isUltimateActive: Bool { ultimateRemaining > 0 }
 
     var isPoisoned: Bool { poisonRemaining > 0 && poisonPerSecond > 0 }
     var isHeld: Bool { holdRemaining > 0 }
@@ -197,8 +257,12 @@ struct FighterState {
         case .arsenal(let a):
             switch a {
             case .tail(let t): return Double(tailSegments) / Double(t.maxSegments)
-            case .shock(let t): return 1 - min(1, contactCooldown / t.cooldown)
+            case .shock(let t): return Double(charge) / Double(t.maxCharge)
             case .virus(let t): return 1 - min(1, contactCooldown / t.cooldown)
+            case .moss(let t): return 1 - min(1, contactCooldown / t.cooldown)
+            case .twin(let t): return 1 - min(1, contactCooldown / t.cooldown)
+            case .cell(let t): return 1 - min(1, contactCooldown / t.cooldown)
+            case .wolf(let t): return 1 - min(1, contactCooldown / t.cooldown)
             case .knives(let k): return min(1, attackTimer / ArsenalSystem.knifeInterval(k, fighter: self))
             default: return min(1, attackTimer / (a.interval ?? 1))
             }
@@ -219,7 +283,7 @@ struct FighterState {
         case .arsenal(let a):
             switch a {
             case .tail: return 0
-            case .shock, .virus: return max(0, contactCooldown)
+            case .shock, .virus, .moss, .wolf, .twin, .cell: return max(0, contactCooldown)
             case .knives(let k): return max(0, ArsenalSystem.knifeInterval(k, fighter: self) - attackTimer)
             default: return max(0, (a.interval ?? 0) - attackTimer)
             }
@@ -230,6 +294,30 @@ struct FighterState {
 enum HoldStyle {
     case shock
     case shackle
+    case ice
+    case web
+    /// Frozen in time (Time Stop, Crash, Lag Spike).
+    case time
+}
+
+/// An extra ball a fighter controls: Twin's twin, or one of Cell's small cells. It's a real physics body
+/// (bouncing and colliding like the fighters) but can't be targeted; it hurts the enemy on contact.
+struct Minion {
+    enum Kind { case twin, cell }
+
+    let owner: PlayerSlot
+    let kind: Kind
+    var bodyIndex: Int
+    var age: Double = 0
+    let lifetime: Double
+    var contactCooldown: Double = 0
+}
+
+/// Where Clockwork was at some moment (for its rewind).
+struct RewindPoint {
+    var position: Vec2
+    var velocity: Vec2
+    var health: Double
 }
 
 enum ProjectileKind {
@@ -240,6 +328,17 @@ enum ProjectileKind {
     case harpoon
     case iceSpike
     case cannonball
+    /// Fibonacci's number bolts (showing `label`) and Wizard's Firebolt.
+    case number
+    case firebolt
+    /// Clockwork's spinning gears.
+    case gear
+    /// Spike's shed thorns, Blaster's flare and Vampire's bats.
+    case thorn
+    case flare
+    case bat
+    /// A small orb in the owner's color (shared by many side abilities).
+    case orb
 }
 
 struct Projectile {
@@ -256,6 +355,12 @@ struct Projectile {
     var turnRate: Double = 0
     /// Poison applied on hit (per second, duration).
     var poison: (perSecond: Double, duration: Double)? = nil
+    /// Walls left to bounce off (Ricochet) before breaking.
+    var bounces = 0
+    /// Extra effect on hit (side abilities).
+    var effect: HitEffect? = nil
+    /// The number a Fibonacci bolt shows.
+    var label = 0
 }
 
 /// Something an arsenal fighter leaves on the field.
@@ -267,8 +372,22 @@ struct Hazard {
         case laser(end: Vec2)
         case bomb(fuse: Double)
         case turret(fireTimer: Double)
+        /// A short-lived lightning bolt from `position` to `end` (just for show).
+        case arc(end: Vec2)
         /// Track from `position` to `end`; the train waits `warning`, then runs (progress 0…1).
         case track(end: Vec2, warning: Double, progress: Double, hasHit: Bool)
+        /// Bomb's cluster and carpet bombs: a small blast of `radius` dealing `damage`.
+        case miniBomb(fuse: Double, damage: Double)
+        /// Ice Cone's frozen floor, chilling the enemy standing on it.
+        case icePatch
+        /// A sticky floor patch that slows the enemy standing in it by `slow`.
+        case honey(slow: Double)
+        /// Magma's lava pool, burning the enemy standing in it.
+        case lava
+        /// One of a pair of portals; going in comes out at `exit`. `blue` tells the pair's two colors apart.
+        case portal(exit: Vec2, blue: Bool)
+        /// Glitch's error tile.
+        case errorTile
     }
 
     let owner: PlayerSlot
@@ -279,8 +398,12 @@ struct Hazard {
     let lifetime: Double
     /// Per-hazard hit cooldown so standing on it doesn't hit every frame.
     var hitCooldown: Double = 0
-    /// Random spin for drawing dice and bombs.
-    let rotation: Double
+    /// Spin for drawing dice and bombs; rolling hazards turn as they move.
+    var rotation: Double
+    /// Thrown hazards (dice, bombs) roll and bounce until friction stops them.
+    var velocity: Vec2 = .zero
+    /// A golden die (Weighted Die / Snake Eyes) that only rolls 5 or 6.
+    var loaded = false
 }
 
 struct PulseWave {
@@ -366,6 +489,8 @@ enum BattleEvent {
     case wallBounce(point: Vec2, impactSpeed: Double)
     case damage(DamageEvent)
     case defeated(PlayerSlot, position: Vec2)
+    /// An Ultimate fired, or a one-off side ability worth calling out.
+    case ability(PlayerSlot, name: String, position: Vec2, ultimate: Bool)
     case overtimeStarted
 }
 
@@ -377,6 +502,8 @@ struct BattleState {
     var pulses: [PulseWave] = []
     var threads: [WebThread] = []
     var hazards: [Hazard] = []
+    /// Extra balls (Twin's twin, Cell's small cells).
+    var minions: [Minion] = []
     /// Snake tail points per fighter slot (oldest first).
     var tails: [[Vec2]] = [[], []]
     var battleTime: Double = 0

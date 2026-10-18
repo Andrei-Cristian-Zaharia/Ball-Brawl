@@ -57,13 +57,14 @@ struct TeamMemberTile: View {
         VStack(spacing: 4) {
             FighterPortrait(definition: member.definition, color: member.isAlive ? color : Theme.disabled,
                             size: 58, expression: member.isAlive ? (isSelected ? .happy : .normal) : .knockedOut)
+                .overlay(alignment: .bottomTrailing) { LevelBadge(level: member.definition.level, size: 9).offset(x: 10, y: 2) }
             Text(member.definition.name)
                 .font(Theme.bodyFont(13, weight: .black))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1).minimumScaleFactor(0.7)
             HealthPill(fraction: member.healthFraction, color: member.isAlive ? color : Theme.disabled,
                        overheal: max(0, member.health - member.definition.maxHealth) / member.definition.maxHealth)
-            Text(member.isAlive ? "\(Int(member.health.rounded(.up))) HP" : "K.O.")
+            Text(member.isAlive ? String(localized: "\(Int(member.health.rounded(.up))) HP") : String(localized: "K.O."))
                 .font(Theme.bodyFont(11, weight: .black))
                 .foregroundStyle(member.isAlive ? Theme.ink : Theme.ink.opacity(0.5))
         }
@@ -74,7 +75,7 @@ struct TeamMemberTile: View {
         .offset(y: isSelected ? 3 : 0)
         .overlay(alignment: .top) {
             if let tag {
-                Text(tag)
+                Text(tag.localized)
                     .font(Theme.bodyFont(10, weight: .black))
                     .foregroundStyle(Theme.ink)
                     .padding(.horizontal, 7).padding(.vertical, 2)
@@ -95,7 +96,7 @@ struct TeamStatusRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
+            Text(title.localized)
                 .font(Theme.bodyFont(12, weight: .black))
                 .foregroundStyle(Theme.ink.opacity(0.7))
             HStack(spacing: 8) {

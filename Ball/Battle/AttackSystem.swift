@@ -28,7 +28,7 @@ enum AttackSystem {
             case .projectile(let spec):
                 updateProjectileAttack(slot, spec, &state, dt: dt, events: &events)
             case .contact(let spec):
-                updateContactAttack(slot, spec, &state, armed: armed, contacts: contacts, damage: &damage)
+                updateContactAttack(slot, spec, &state, armed: armed, contacts: contacts, events: &events, damage: &damage)
             case .pulse(let spec):
                 updatePulseAttack(slot, spec, &state, dt: dt, events: &events)
             case .grab(let spec):
@@ -47,6 +47,7 @@ enum AttackSystem {
             }
         }
 
+        AbilitySystem.update(&state, dt: dt, events: &events, damage: &damage)
         ArsenalSystem.updateShared(&state, dt: dt, events: &events, damage: &damage)
         updateProjectiles(&state, dt: dt, events: &events, damage: &damage)
         updatePulses(&state, dt: dt, damage: &damage)
@@ -74,7 +75,8 @@ enum AttackSystem {
                 velocity: fighter.aim * spec.projectileSpeed,
                 radius: spec.projectileRadius,
                 baseDamage: spec.damage,
-                maxLifetime: spec.maxLifetime
+                maxLifetime: spec.maxLifetime,
+                bounces: { if case .ricochet(let n) = fighter.definition.abilities.perk { return n }; return 0 }()
             ))
             events.append(.projectileFired(owner: slot, position: spawn, direction: fighter.aim))
         }
@@ -117,18 +119,23 @@ enum AttackSystem {
                     target: p.owner.opponent,
                     amount: p.baseDamage * state.damageMultiplier,
                     point: target.position - direction * target.radius,
-                    source: p.kind == .shard || p.kind == .iceSpike ? .shard : .projectile,
+                    source: [.shard, .iceSpike, .thorn].contains(p.kind) ? .shard : .projectile,
                     direction: direction
                 ))
                 ArsenalSystem.projectileHit(p, state: &state, events: &events)
+                AbilitySystem.projectileHit(p, state: &state, events: &events)
                 continue
             }
 
             let r = p.radius
             if p.position.x - r <= 0 || p.position.x + r >= width ||
                 p.position.y - r <= 0 || p.position.y + r >= height {
-                if p.kind == .bee {
-                    // Bees bounce off walls instead of dying.
+                if p.kind == .bee || p.kind == .bat || p.bounces > 0 {
+                    // Bees and bats bounce off walls instead of dying; ricochet bolts bounce a set number of times.
+                    if p.kind != .bee && p.kind != .bat {
+                        p.bounces -= 1
+                        events.append(.projectileHitWall(owner: p.owner, position: p.position))
+                    }
                     if p.position.x - r <= 0 || p.position.x + r >= width { p.velocity.x = -p.velocity.x }
                     if p.position.y - r <= 0 || p.position.y + r >= height { p.velocity.y = -p.velocity.y }
                     p.position = Vec2(min(max(p.position.x, r), width - r), min(max(p.position.y, r), height - r))
@@ -149,7 +156,7 @@ enum AttackSystem {
     private static func updateContactAttack(
         _ slot: PlayerSlot, _ spec: ContactAttack,
         _ state: inout BattleState, armed: [Bool],
-        contacts: [BodyContact], damage: inout [DamageEvent]
+        contacts: [BodyContact], events: inout [BattleEvent], damage: inout [DamageEvent]
     ) {
         guard armed[slot.rawValue] else { return }
 
@@ -170,7 +177,7 @@ enum AttackSystem {
             return
         }
         let ramFactor = min(1, approach / spec.fullDamageSpeed)
-        let base = spec.minDamage + (spec.maxDamage - spec.minDamage) * ramFactor
+        let base = (spec.minDamage + (spec.maxDamage - spec.minDamage) * ramFactor) * AbilitySystem.ramBoost(state.fighter(slot))
         let myBody = state.world.bodies[mine]
         damage.append(DamageEvent(
             target: slot.opponent,
@@ -180,6 +187,7 @@ enum AttackSystem {
             direction: towardOpponent
         ))
         state.fighters[slot.rawValue].contactCooldown = spec.cooldown
+        AbilitySystem.rammed(slot, state: &state, events: &events)
     }
 
     // MARK: Pulse
@@ -270,11 +278,13 @@ enum AttackSystem {
         var target = state.world.bodies[targetIndex]
         let me = state.body(of: slot)
 
-        func finishGrab() {
+        var slamPoint: Vec2?
+        func finishGrab(slamAt point: Vec2? = nil) {
             target.isKinematic = false
             target.ignoresSpeedLimit = false
             fighter.grabPhase = .idle
             fighter.attackTimer = 0
+            slamPoint = point
         }
 
         switch fighter.grabPhase {
@@ -317,7 +327,7 @@ enum AttackSystem {
                 if into < 0 { target.velocity -= n * (2 * into) }
                 damage.append(DamageEvent(target: slot.opponent, amount: spec.smashDamage * state.damageMultiplier,
                                           point: position - n * r, source: .slam, direction: -n))
-                finishGrab()
+                finishGrab(slamAt: position - n * r)
             } else if elapsed >= spec.swingDuration {
                 target.isKinematic = false
                 target.ignoresSpeedLimit = true
@@ -332,9 +342,10 @@ enum AttackSystem {
             elapsed += dt
             if let wall = physics.wallContacts.first(where: { $0.body == targetIndex }) {
                 let direction = (wall.wallPoint - wall.point).normalized
-                damage.append(DamageEvent(target: slot.opponent, amount: spec.smashDamage * state.damageMultiplier,
+                let boost = AbilitySystem.slamBoost(fighter, impactSpeed: wall.impactSpeed)
+                damage.append(DamageEvent(target: slot.opponent, amount: spec.smashDamage * boost * state.damageMultiplier,
                                           point: wall.wallPoint, source: .slam, direction: direction))
-                finishGrab()
+                finishGrab(slamAt: wall.wallPoint)
             } else if elapsed >= spec.throwTimeout ||
                         physics.bodyContacts.contains(where: { $0.a == targetIndex || $0.b == targetIndex }) {
                 // Throw blocked or fizzled: no damage.
@@ -346,6 +357,7 @@ enum AttackSystem {
 
         state.fighters[slot.rawValue] = fighter
         state.world.bodies[targetIndex] = target
+        if let slamPoint { AbilitySystem.slammed(slot, at: slamPoint, state: &state, events: &events) }
     }
 
     // MARK: Vampire

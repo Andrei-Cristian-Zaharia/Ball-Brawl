@@ -8,7 +8,7 @@ enum PlayerSlot: Int, CaseIterable, Identifiable, Hashable {
 
     var id: Int { rawValue }
     var label: String { self == .one ? "P1" : "P2" }
-    var title: String { self == .one ? "Player 1" : "Player 2" }
+    var title: String { self == .one ? String(localized: "Player 1") : String(localized: "Player 2") }
     var opponent: PlayerSlot { self == .one ? .two : .one }
 }
 

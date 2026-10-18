@@ -1,0 +1,109 @@
+{
+  "identifier": "89C2E474-58C4-4146-845F-80B29D30A182",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "1000000000",
+      "localizations": [
+        {
+          "description": "1000 coins, 5 chests and 6 Spike cards. One time only.",
+          "displayName": "Starter Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.starter",
+      "referenceName": "Starter Pack",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "1000000001",
+      "localizations": [
+        {
+          "description": "Three chests full of coins and cards.",
+          "displayName": "3 Chests",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.chests.3",
+      "referenceName": "3 Chests",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "1000000002",
+      "localizations": [
+        {
+          "description": "Ten chests full of coins and cards.",
+          "displayName": "10 Chests",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.chests.10",
+      "referenceName": "10 Chests",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "1000000003",
+      "localizations": [
+        {
+          "description": "500 coins.",
+          "displayName": "Pouch of Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.coins.small",
+      "referenceName": "Pouch of Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "1000000004",
+      "localizations": [
+        {
+          "description": "1,500 coins.",
+          "displayName": "Bag of Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.coins.medium",
+      "referenceName": "Bag of Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "7.99",
+      "familyShareable": false,
+      "internalID": "1000000005",
+      "localizations": [
+        {
+          "description": "5,000 coins.",
+          "displayName": "Chest of Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.ballbrawl.coins.large",
+      "referenceName": "Chest of Coins",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "1000000099",
+    "_developerTeamID": "NYWAAD7K59",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}
