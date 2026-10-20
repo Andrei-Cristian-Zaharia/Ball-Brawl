@@ -33,6 +33,8 @@ enum GameConfig {
     static let countdownDuration: Double = 3.0
     /// Delay between the final blow and the results screen, so the KO is visible.
     static let resultsDelay: Double = 1.1
+    /// Online: away from a fight (app in the background) longer than this counts as leaving it.
+    static let onlineAwayLimit: Double = 30
 
     /// Spawn positions as a fraction of arena height (P1 top, P2 bottom).
     static let spawnHeightFraction: Double = 0.25

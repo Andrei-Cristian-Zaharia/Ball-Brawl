@@ -27376,6 +27376,41 @@
         }
       }
     },
+    "You were away too long and left the battle.": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du warst zu lange weg und hast den Kampf verlassen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estuviste ausente demasiado tiempo y abandonaste la batalla."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Absence trop longue : tu as quitté le combat."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você ficou ausente por muito tempo e saiu da batalha."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ai lipsit prea mult și ai părăsit lupta."
+          }
+        }
+      }
+    },
     "Your %@ survived with %lld HP. Keep it in, or swap in a teammate.": {
       "extractionState": "manual",
       "localizations": {

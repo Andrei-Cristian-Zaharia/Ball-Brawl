@@ -6,6 +6,8 @@ struct BattleView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// The battle whose intro has finished (the view is reused between rounds).
     @State private var introDone: ObjectIdentifier?
+    /// When the app went to the background mid versus fight.
+    @State private var awaySince: Date?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -47,8 +49,26 @@ struct BattleView: View {
             if outcome != nil { model.recordResult(from: engine) }
         }
         .onChange(of: scenePhase) { _, phase in
-            // Multiplayer fights keep running when the app leaves the screen; there's no pausing them.
-            if phase != .active, !model.isVersusMatch { engine.setPaused(true) }
+            if model.isVersusMatch {
+                trackAway(phase)
+            } else if phase != .active {
+                engine.setPaused(true)
+            }
+        }
+    }
+
+    /// Multiplayer fights can't be paused; staying in the background too long mid-fight counts as leaving it.
+    private func trackAway(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            if engine.outcome == nil, awaySince == nil { awaySince = .now }
+        case .active:
+            if let awaySince, Date.now.timeIntervalSince(awaySince) > GameConfig.onlineAwayLimit {
+                model.leaveVersusBattleAfterAway()
+            }
+            awaySince = nil
+        default:
+            break
         }
     }
 

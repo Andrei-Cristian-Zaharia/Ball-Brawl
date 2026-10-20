@@ -656,6 +656,14 @@ final class AppModel {
         onlineNotice = String(localized: "\(online.opponentName) left the battle. You win! +\(rewards.trophies) trophies")
     }
 
+    /// Away from a versus fight too long: it counts as leaving (a ranked series is lost).
+    func leaveVersusBattleAfterAway() {
+        guard isVersusMatch, screen == .battle else { return }
+        let ranked = rankedSeriesInProgress
+        showMenu()
+        if !ranked { showToast(String(localized: "You were away too long and left the battle.")) }
+    }
+
     // MARK: Crusade
 
     /// Chapter shown on the crusade screen, and the level picked for the prep screen.
