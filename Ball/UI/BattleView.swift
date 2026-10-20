@@ -47,7 +47,8 @@ struct BattleView: View {
             if outcome != nil { model.recordResult(from: engine) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { engine.setPaused(true) }
+            // Multiplayer fights keep running when the app leaves the screen; there's no pausing them.
+            if phase != .active, !model.isVersusMatch { engine.setPaused(true) }
         }
     }
 
