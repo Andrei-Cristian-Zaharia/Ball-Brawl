@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -17,6 +18,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: scenePhase) { _, phase in model.scenePhaseChanged(phase) }
     }
 
     /// 1 on phones; on bigger screens, enough to fill them with a layout about 440 × 900 points.

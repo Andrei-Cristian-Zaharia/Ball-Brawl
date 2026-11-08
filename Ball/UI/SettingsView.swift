@@ -14,6 +14,7 @@ final class GameSettings {
     /// The game's languages (codes match the .lproj folders), with each one's own name.
     static let languages: [(code: String, name: String)] = [
         ("en", "English"), ("es", "Español"), ("pt-BR", "Português"), ("de", "Deutsch"), ("fr", "Français"), ("ro", "Română"),
+        ("ja", "日本語"), ("zh-Hans", "简体中文"), ("ko", "한국어"),
     ]
 
     /// The language picked in Settings, or nil to follow the device. Saved as the app's own language

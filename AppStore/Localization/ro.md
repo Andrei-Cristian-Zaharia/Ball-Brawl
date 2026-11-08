@@ -12,7 +12,7 @@ Sari, zdrobește și luptă cu peste 33 de bile nebune! Aruncă vrăji, varsă l
 ## Keywords (100) — 91 characters
 pvp,arena,fizica,ricoseu,bataie,multiplayer,duel,versus,strategie,carti,arcade,prieteni,3v3
 
-## Description (4000) — 2223 characters
+## Description (4000) — 2265 characters
 Alege-ți bilele, țintește lansarea și privește-le cum se bat!
 
 Ball Brawl este un joc de lupte în arenă rapid și plin de ricoșeuri. Fiecare bilă are felul ei nebun de a lupta: trage cu fulgere, lovește cu țepi, lasă lavă în urmă, aruncă vrăji, deschide portaluri, dă timpul înapoi și multe altele. Formează-ți echipa, lansează-te în arenă și lasă fizica să facă restul.
@@ -46,7 +46,7 @@ CARACTERISTICI
 • Grafică de desen animat, cu lovituri spectaculoase, K.O.-uri și momente Supreme
 • Progresul se sincronizează între dispozitivele tale prin iCloud
 • Clasamente și invitații pentru prieteni prin Game Center
-• Disponibil în română, engleză, spaniolă, portugheză, germană și franceză
+• Disponibil în română, engleză, spaniolă, portugheză, germană, franceză, japoneză, chineză simplificată și coreeană
 
 Ball Brawl este gratuit. Există achiziții opționale în aplicație și poți urmări reclame scurte pentru recompense în plus.
 

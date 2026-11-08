@@ -12,7 +12,7 @@ Colecciona bolas y lucha
 ## Keywords (100) — 94 characters
 pvp,arena,fisica,rebote,pelea,multijugador,duelo,versus,choque,estrategia,cartas,arcade,amigos
 
-## Description (4000) — 2202 characters
+## Description (4000) — 2240 characters
 ¡Elige tus bolas, apunta el lanzamiento y míralas pelear!
 
 Ball Brawl es un juego de batallas en arena rápido y lleno de rebotes. Cada bola tiene su propia forma salvaje de luchar: dispara rayos, embiste con pinchos, deja lava, lanza hechizos, abre portales, retrocede el tiempo y mucho más. Arma tu equipo, lánzate a la arena y deja que la física haga el resto.
@@ -46,7 +46,7 @@ CARACTERÍSTICAS
 • Arte de dibujos animados con golpes jugosos, K.O. y grandes momentos Definitivos
 • Tu progreso se sincroniza entre tus dispositivos con iCloud
 • Clasificaciones e invitaciones a amigos con Game Center
-• Juega en español, inglés, portugués, alemán, francés y rumano
+• Juega en español, inglés, portugués, alemán, francés, rumano, japonés, chino simplificado y coreano
 
 Ball Brawl es gratis. Incluye compras opcionales dentro de la app y puedes ver anuncios cortos para conseguir premios extra.
 

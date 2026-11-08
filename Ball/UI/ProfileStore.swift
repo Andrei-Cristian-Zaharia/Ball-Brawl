@@ -187,8 +187,19 @@ final class ProfileStore {
     private let cloud = NSUbiquitousKeyValueStore.default
     /// Set while adopting a cloud save, so it isn't written straight back.
     private var adoptingCloud = false
+    #if DEBUG
+    /// App Store screenshots: a showcase profile that is never saved or synced.
+    private var isStoreDemo = false
+    #endif
 
     init() {
+        #if DEBUG
+        if StoreDemo.isActive {
+            profile = StoreDemo.profile
+            isStoreDemo = true
+            return
+        }
+        #endif
         if let data = UserDefaults.standard.data(forKey: Self.storageKey),
            let saved = try? JSONDecoder().decode(PlayerProfile.self, from: data) {
             profile = saved
@@ -275,6 +286,9 @@ final class ProfileStore {
     }
 
     private func save() {
+        #if DEBUG
+        guard !isStoreDemo else { return }
+        #endif
         guard !adoptingCloud, let data = try? JSONEncoder().encode(profile) else { return }
         let now = Date.now.timeIntervalSince1970
         UserDefaults.standard.set(data, forKey: Self.storageKey)

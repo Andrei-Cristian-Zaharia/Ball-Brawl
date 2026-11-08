@@ -2,10 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This lets ads you choose to watch for rewards be more relevant to you. You'll still get the same rewards if you say no.</string>
 	<key>GADApplicationIdentifier</key>
-	<!-- AdMob app ID for Ball Brawl. -->
 	<string>ca-app-pub-8505602361918016~9684058448</string>
 	<key>SKAdNetworkItems</key>
 	<array>
@@ -206,7 +203,5 @@
 			<string>3qcr597p9d.skadnetwork</string>
 		</dict>
 	</array>
-	<key>NSGKFriendListUsageDescription</key>
-	<string>Ball Brawl shows your Game Center friends so you can invite them to battle.</string>
 </dict>
 </plist>

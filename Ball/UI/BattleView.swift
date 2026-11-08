@@ -6,8 +6,6 @@ struct BattleView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// The battle whose intro has finished (the view is reused between rounds).
     @State private var introDone: ObjectIdentifier?
-    /// When the app went to the background mid versus fight.
-    @State private var awaySince: Date?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -37,7 +35,7 @@ struct BattleView: View {
         .padding(.vertical, 8)
         .overlay { overlay }
         .overlay {
-            if introDone != ObjectIdentifier(engine) {
+            if introDone != ObjectIdentifier(engine) && !skipsIntro {
                 BattleIntroView(setup: engine.setup,
                                 onStart: engine.finishIntro,
                                 onDone: { introDone = ObjectIdentifier(engine) })
@@ -49,27 +47,22 @@ struct BattleView: View {
             if outcome != nil { model.recordResult(from: engine) }
         }
         .onChange(of: scenePhase) { _, phase in
+            // Multiplayer fights can't be paused (AppModel handles staying away too long).
             if model.isVersusMatch {
-                trackAway(phase)
+                // The fight goes on without this device; don't keep the opponent waiting at the launch.
+                if phase == .background { engine.lockLaunchNow() }
             } else if phase != .active {
                 engine.setPaused(true)
             }
         }
     }
 
-    /// Multiplayer fights can't be paused; staying in the background too long mid-fight counts as leaving it.
-    private func trackAway(_ phase: ScenePhase) {
-        switch phase {
-        case .background:
-            if engine.outcome == nil, awaySince == nil { awaySince = .now }
-        case .active:
-            if let awaySince, Date.now.timeIntervalSince(awaySince) > GameConfig.onlineAwayLimit {
-                model.leaveVersusBattleAfterAway()
-            }
-            awaySince = nil
-        default:
-            break
-        }
+    private var skipsIntro: Bool {
+        #if DEBUG
+        engine.isHeldForStoreDemo
+        #else
+        false
+        #endif
     }
 
     /// During the countdown, each player drags on their half of the arena (P1 top, P2 bottom)

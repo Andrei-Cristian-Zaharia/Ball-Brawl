@@ -109,7 +109,7 @@ private struct PlayerSetupPanel: View {
             // Compact roster grid; full details only for the selected fighter.
             if !player.isReady && !isRemote {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 8)], spacing: 10) {
-                    ForEach(model.profile.unlockedRoster) { def in
+                    ForEach(model.setupRoster) { def in
                         rosterTile(def, selected: player.fighterID == def.id)
                     }
                 }

@@ -12,7 +12,7 @@ Quique, esmague e batalhe com mais de 33 bolas selvagens! Lance feitiços, espal
 ## Keywords (100) — 96 characters
 pvp,arena,fisica,quicar,luta,multijogador,duelo,versus,confronto,estrategia,cartas,arcade,amigos
 
-## Description (4000) — 2131 characters
+## Description (4000) — 2170 characters
 Escolha suas bolas, mire o lançamento e veja a briga começar!
 
 Ball Brawl é um jogo de batalha em arena rápido e cheio de quiques. Cada bola tem seu próprio jeito selvagem de lutar: dispara raios, investe com espinhos, espalha lava, lança feitiços, abre portais, volta no tempo e muito mais. Monte seu time, lance-se na arena e deixe a física fazer o resto.
@@ -46,7 +46,7 @@ RECURSOS
 • Visual de desenho animado com golpes caprichados, K.O.s e grandes momentos de Suprema
 • Seu progresso sincroniza entre seus aparelhos pelo iCloud
 • Placares e convites para amigos com o Game Center
-• Jogue em português, inglês, espanhol, alemão, francês e romeno
+• Jogue em português, inglês, espanhol, alemão, francês, romeno, japonês, chinês simplificado e coreano
 
 Ball Brawl é grátis. Há compras opcionais no app, e você pode assistir a anúncios curtos para ganhar prêmios extras.
 

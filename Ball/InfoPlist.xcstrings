@@ -10,6 +10,12 @@
             "value": "Ball Brawl"
           }
         },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
         "es": {
           "stringUnit": {
             "state": "translated",
@@ -22,19 +28,31 @@
             "value": "Ball Brawl"
           }
         },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Ball Brawl"
           }
         },
-        "en": {
+        "ro": {
           "stringUnit": {
             "state": "translated",
             "value": "Ball Brawl"
           }
         },
-        "ro": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Ball Brawl"
@@ -51,6 +69,24 @@
             "state": "new",
             "value": "Ball"
           }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl"
+          }
         }
       }
     },
@@ -63,6 +99,24 @@
             "state": "new",
             "value": "Ball Brawl shows your Game Center friends so you can invite them to battle."
           }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball BrawlはGame Centerのフレンドを表示して、バトルに招待できるようにします。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl에서 Game Center 친구를 표시해 배틀에 초대할 수 있어요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ball Brawl 会显示你的 Game Center 好友，方便你邀请他们对战。"
+          }
         }
       }
     },
@@ -73,6 +127,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "So passen Werbevideos, die du für Belohnungen anschaust, besser zu dir. Wenn du ablehnst, bekommst du trotzdem dieselben Belohnungen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This lets ads you choose to watch for rewards be more relevant to you. You'll still get the same rewards if you say no."
           }
         },
         "es": {
@@ -87,22 +147,34 @@
             "value": "Les pubs que tu choisis de regarder pour des récompenses seront plus adaptées à toi. Si tu refuses, tu reçois quand même les mêmes récompenses."
           }
         },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "報酬を受け取るために自分で選んで見る広告が、あなたに合ったものになります。許可しなくても、もらえる報酬は変わりません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보상을 위해 선택해서 시청하는 광고가 더 관련성 있게 표시돼요. 허용하지 않아도 보상은 똑같이 받을 수 있어요."
+          }
+        },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Assim, os anúncios que você escolhe assistir para ganhar prêmios serão mais relevantes para você. Se disser não, você ganha os mesmos prêmios."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This lets ads you choose to watch for rewards be more relevant to you. You'll still get the same rewards if you say no."
-          }
-        },
         "ro": {
           "stringUnit": {
             "state": "translated",
             "value": "Astfel, reclamele pe care alegi să le urmărești pentru recompense vor fi mai potrivite pentru tine. Dacă refuzi, primești aceleași recompense."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这能让你为获取奖励而选择观看的广告与你更相关。即使你拒绝，也会获得同样的奖励。"
           }
         }
       }

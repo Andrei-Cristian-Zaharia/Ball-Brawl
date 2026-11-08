@@ -12,7 +12,7 @@ Rebondis, écrase et combats avec plus de 33 balles déchaînées ! Lance des so
 ## Keywords (100) — 94 characters
 pvp,arene,physique,rebond,combat,multijoueur,duel,versus,choc,strategie,cartes,arcade,amis,3v3
 
-## Description (4000) — 2387 characters
+## Description (4000) — 2424 characters
 Choisis tes balles, vise le lancer et regarde-les se battre !
 
 Ball Brawl est un jeu de combat en arène rapide et rebondissant. Chaque balle a sa propre façon déchaînée de se battre : elle tire des éclairs, fonce avec ses pics, laisse de la lave, lance des sorts, ouvre des portails, remonte le temps et bien plus. Forme ton équipe, lance-toi dans l'arène et laisse la physique faire le reste.
@@ -46,7 +46,7 @@ FONCTIONNALITÉS
 • Un style cartoon coloré avec des coups percutants, des K.O. et de grands moments d'Ultime
 • Ta progression se synchronise entre tes appareils avec iCloud
 • Classements et invitations d'amis avec Game Center
-• Disponible en français, anglais, espagnol, portugais, allemand et roumain
+• Disponible en français, anglais, espagnol, portugais, allemand, roumain, japonais, chinois simplifié et coréen
 
 Ball Brawl est gratuit. Des achats intégrés optionnels sont disponibles, et tu peux regarder de courtes pubs pour gagner des récompenses en plus.
 

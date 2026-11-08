@@ -1,3 +1,4 @@
+import Network
 import SwiftUI
 
 nonisolated struct PlayerSetup: Equatable {
@@ -152,11 +153,22 @@ final class AppModel {
     init() {
         store = StoreService(profile: profile)
         store.onDelivered = { [weak self] offer in self?.showToast(String(localized: "\(offer.title.localized) delivered!")) }
-        ads.start()
         online.onEvent = { [weak self] event in self?.handleOnline(event) }
+        #if DEBUG
+        if !StoreDemo.isActive { ads.start() }
+        #else
+        ads.start()
+        #endif
         online.localName = { [weak self] in self?.playerDisplayName ?? "" }
+        #if DEBUG
+        if StoreDemo.isActive {
+            startStoreDemo()
+            return
+        }
+        #endif
         // A ranked series the app was closed in the middle of counts as a loss.
         forfeitRankedSeries()
+        watchNetwork()
         // Sign in to Game Center in the background. Only online play (casual and ranked) needs it;
         // bots, the Crusade and the Collection work without it.
         online.authenticate()
@@ -351,6 +363,9 @@ final class AppModel {
         return Progression.leveled(base, level: players[slot.rawValue].level)
     }
 
+    /// Balls offered on the setup screen: every ball for 2 players on one device, owned balls otherwise.
+    var setupRoster: [FighterDefinition] { mode == .local ? FighterCatalog.all : profile.unlockedRoster }
+
     func showMenu() {
         forfeitRankedSeries()
         if mode == .online { online.leave() }
@@ -520,7 +535,7 @@ final class AppModel {
         case .disconnected(let reason):
             guard mode == .online else { return }
             if rankedSeriesInProgress, series?.outcome == nil {
-                winByForfeit()
+                endRankedSeriesEarly()
             } else {
                 onlineNotice = reason
             }
@@ -656,9 +671,87 @@ final class AppModel {
         onlineNotice = String(localized: "\(online.opponentName) left the battle. You win! +\(rewards.trophies) trophies")
     }
 
-    /// Away from a versus fight too long: it counts as leaving (a ranked series is lost).
-    func leaveVersusBattleAfterAway() {
-        guard isVersusMatch, screen == .battle else { return }
+    /// The ranked opponent is gone mid-series (the connection dropped, or their pick never came). Whoever had
+    /// trouble on their side (the app in the background, no network) loses; the other player wins. Without
+    /// this, both devices would see the other one leave and both would win.
+    private func endRankedSeriesEarly() {
+        if connectionTroubleIsOurs {
+            forfeitRankedSeries()
+            onlineNotice = String(localized: "Your connection dropped, so the ranked battle counts as a loss.")
+        } else {
+            winByForfeit()
+        }
+    }
+
+    /// Ranked online: if the opponent's pick (or, for the client, the host's start) never comes, they've gone.
+    private func waitForOpponentPick(round: Int) {
+        Task {
+            try? await Task.sleep(for: .seconds(GameConfig.onlineAwayLimit))
+            guard mode == .online, screen == .roundPrep, isWaitingForOpponentPick, series?.round == round,
+                  rankedSeriesInProgress else { return }
+            endRankedSeriesEarly()
+            online.leave()
+            battle = nil
+            series = nil
+            screen = .onlineLobby
+        }
+    }
+
+    // MARK: Away and connection trouble
+
+    /// The app is in the background / has no network right now.
+    @ObservationIgnored private var isAway = false
+    @ObservationIgnored private var isOffline = false
+    /// When this device last went to or came back from the background, or lost or regained its network.
+    @ObservationIgnored private var lastTroubleAt: Date?
+    /// When the app went to the background in the middle of a versus match.
+    @ObservationIgnored private var awaySince: Date?
+    @ObservationIgnored private let network = NWPathMonitor()
+    /// A dropped versus match is this device's fault if it had trouble this recently (the drop can arrive
+    /// a while after the trouble, e.g. once the app is back on screen).
+    private static let troubleWindow: TimeInterval = 30
+
+    private var connectionTroubleIsOurs: Bool {
+        isAway || isOffline || lastTroubleAt.map { Date.now.timeIntervalSince($0) < Self.troubleWindow } ?? false
+    }
+
+    private func watchNetwork() {
+        network.pathUpdateHandler = { [weak self] path in
+            let reachable = path.status == .satisfied
+            Task { @MainActor in self?.networkChanged(reachable: reachable) }
+        }
+        network.start(queue: .main)
+    }
+
+    private func networkChanged(reachable: Bool) {
+        guard isOffline == reachable else { return }
+        isOffline = !reachable
+        lastTroubleAt = .now
+    }
+
+    /// The app moved to or from the background. Away from a versus match too long counts as leaving it.
+    func scenePhaseChanged(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            isAway = true
+            lastTroubleAt = .now
+            if isVersusMatch, awaySince == nil { awaySince = .now }
+        case .active:
+            if isAway { lastTroubleAt = .now }
+            isAway = false
+            if let awaySince, Date.now.timeIntervalSince(awaySince) > GameConfig.onlineAwayLimit {
+                leaveVersusMatchAfterAway()
+            }
+            awaySince = nil
+        default:
+            break
+        }
+    }
+
+    /// Away from a versus match too long: it counts as leaving (a ranked series is lost).
+    private func leaveVersusMatchAfterAway() {
+        let fighting = screen == .battle && battle?.outcome == nil
+        guard isVersusMatch, rankedSeriesInProgress || fighting else { return }
         let ranked = rankedSeriesInProgress
         showMenu()
         if !ranked { showToast(String(localized: "You were away too long and left the battle.")) }
@@ -781,6 +874,7 @@ final class AppModel {
             myPick = (playerIndex, aimAngle)
             online.send(.roundPick(index: playerIndex, aimAngle: aimAngle))
             startOnlineSeriesRoundIfReady()
+            waitForOpponentPick(round: series.round)
         case .standIn:
             // Like a real opponent, the stand-in "locks in" a moment later (never past the clock).
             guard let series, series.player[playerIndex].isAlive, myPick == nil else { return }
@@ -992,3 +1086,28 @@ final class AppModel {
         startSeriesRound(playerIndex: index, aimAngle: aimAngle)
     }
 }
+
+#if DEBUG
+extension AppModel {
+    /// App Store screenshot: a ranked fight frozen mid-way, with both teams on the bench.
+    func startStoreDemoBattle() {
+        let mine = StoreDemo.playerTeam.compactMap(FighterCatalog.definition(id:)).map(profile.definition)
+        let theirs = StoreDemo.opponentTeam.compactMap(FighterCatalog.definition(id:))
+            .map { Progression.leveled($0, level: StoreDemo.opponentLevel) }
+        mode = .standIn
+        standIn = StandInOpponent(name: StoreDemo.opponentName, ranked: true, fighterID: theirs[0].id, level: StoreDemo.opponentLevel)
+        series = BotSeries(playerTeam: mine, opponentTeam: theirs, seed: 1)
+        roundPicks = (0, 0)
+        let setup = MatchSetup(
+            loadouts: [FighterLoadout(definition: mine[0], aimAngle: .pi / 2), FighterLoadout(definition: theirs[0], aimAngle: -.pi / 2)],
+            labels: [playerDisplayName, StoreDemo.opponentName],
+            steerableSlots: [.one],
+            map: profile.arena.map
+        )
+        let engine = BattleEngine(setup: setup, seed: StoreDemo.battleSeed)
+        engine.holdForStoreDemo(at: StoreDemo.battleTime)
+        battle = engine
+        screen = .battle
+    }
+}
+#endif

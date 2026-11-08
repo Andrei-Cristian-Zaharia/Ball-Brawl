@@ -12,7 +12,7 @@ Bounce, smash and battle with 33+ wild balls! Cast spells, spill lava and open p
 ## Keywords (100) — 96 characters
 pvp,arena,physics,bounce,brawler,multiplayer,duel,versus,clash,strategy,cards,arcade,friends,3v3
 
-## Description (4000) — 1937 characters
+## Description (4000) — 1975 characters
 Pick your balls, aim the launch and watch them brawl!
 
 Ball Brawl is a fast, bouncy arena battler. Every ball has its own wild way to fight: shoot bolts, ram with spikes, drop lava, cast spells, open portals, rewind time and much more. Build a team, launch into the arena and let physics do the rest.
@@ -46,7 +46,7 @@ FEATURES
 • Bright cartoon art with juicy hits, K.O.s and big Ultimate moments
 • Your progress syncs across your devices with iCloud
 • Game Center leaderboards and friend invites
-• Play in English, Spanish, Portuguese, German, French and Romanian
+• Play in English, Spanish, Portuguese, German, French, Romanian, Japanese, Simplified Chinese and Korean
 
 Ball Brawl is free to play. Optional in-app purchases are available, and you can choose to watch short ads for extra rewards.
 

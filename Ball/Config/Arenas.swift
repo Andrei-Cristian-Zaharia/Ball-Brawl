@@ -10,8 +10,11 @@ nonisolated struct ArenaTier {
     /// Balls unlocked by reaching this arena.
     let balls: [String]
     /// Ball levels a player here typically has without buying chests; bots stay inside this range.
-    /// From simulating a free player (ranked wins, chests, level-up rewards): the team averages about 5 by
-    /// the end of Training Camp, then climbs slowly as card costs grow, to about 8 in the Royal Arena.
+    /// From simulating a free player (~10 ranked battles a day at a 55% win rate, plus daily login, quests, free
+    /// chests, trophy road and level-up rewards): the battle team averages about 6 leaving Training Camp (day 2),
+    /// 7 at Sandy Dunes (day 5), 8 at Frost Peak (day 10), 9 at Lava Volcano (day 16) and in the Royal Arena
+    /// (day 25), then about 10 by 2500 trophies. Ranges start a little below that so an arena's first battles
+    /// aren't a wall, and neighbouring arenas overlap so crossing a gate doesn't jump.
     let botLevels: ClosedRange<Int>
 }
 
@@ -22,15 +25,15 @@ nonisolated enum Arenas {
         ArenaTier(number: 1, name: "Training Camp", map: .classic, trophies: 0,
                   balls: ["blaster", "spike", "pulse", "snake", "bomb", "glass", "virus", "electric"], botLevels: 1...5),
         ArenaTier(number: 2, name: "Green Meadow", map: .meadow, trophies: 150,
-                  balls: ["grappler", "laser", "dice", "thief", "moss", "icecone"], botLevels: 4...6),
+                  balls: ["grappler", "laser", "dice", "thief", "moss", "icecone"], botLevels: 5...7),
         ArenaTier(number: 3, name: "Sandy Dunes", map: .dunes, trophies: 400,
-                  balls: ["zone", "shackle", "cannon", "magma", "harpoon"], botLevels: 5...7),
+                  balls: ["zone", "shackle", "cannon", "magma", "harpoon"], botLevels: 6...8),
         ArenaTier(number: 4, name: "Frost Peak", map: .frost, trophies: 800,
-                  balls: ["conductor", "wolf", "fibonacci", "cell", "gambit", "vampire"], botLevels: 6...8),
+                  balls: ["conductor", "wolf", "fibonacci", "cell", "gambit", "vampire"], botLevels: 7...9),
         ArenaTier(number: 5, name: "Lava Volcano", map: .volcano, trophies: 1300,
-                  balls: ["hive", "weaver", "wizard", "twin"], botLevels: 7...9),
+                  balls: ["hive", "weaver", "wizard", "twin"], botLevels: 8...10),
         ArenaTier(number: 6, name: "Royal Arena", map: .royal, trophies: 2000,
-                  balls: ["eclipse", "clockwork", "portal", "glitch"], botLevels: 7...10),
+                  balls: ["eclipse", "clockwork", "portal", "glitch"], botLevels: 9...11),
     ]
 
     /// Trophies won or lost per ranked battle. A loss never drops you below your arena's gate.

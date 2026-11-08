@@ -14,7 +14,8 @@ final class BattleEngine {
     /// 0…1 fraction between the last two physics steps, for smooth rendering.
     @ObservationIgnored private(set) var interpolation: Double = 0
     @ObservationIgnored private var lastDate: Date?
-    @ObservationIgnored private var accumulator: Double = 0
+    /// Real seconds the simulation still has to catch up on.
+    @ObservationIgnored private var owed: Double = 0
     @ObservationIgnored private var outcomeScheduled = false
     @ObservationIgnored private let haptics = Haptics()
     /// Real seconds left of a hit-stop freeze (big hits briefly freeze the action).
@@ -26,6 +27,8 @@ final class BattleEngine {
     private static let hitStopDuration = 0.07
     private static let knockoutSlowMotion = 1.1
     private static let slowMotionRate = 0.3
+    /// Most real time played per frame; after a trip to the background an online fight fast-forwards at this rate.
+    private static let maxCatchUpPerFrame = 0.5
 
     private(set) var isPaused = false
     /// Held still while the VS intro plays; the countdown starts once it ends.
@@ -36,6 +39,10 @@ final class BattleEngine {
     /// Online: the slot this device locks when its countdown ends; the opponent's lock arrives over the network.
     @ObservationIgnored let onlineSlot: PlayerSlot?
     @ObservationIgnored var onLaunchLocked: ((Double) -> Void)?
+    #if DEBUG
+    /// App Store screenshots: the fight is held still at a chosen moment.
+    @ObservationIgnored private(set) var isHeldForStoreDemo = false
+    #endif
 
     init(setup: MatchSetup, seed: UInt64 = UInt64.random(in: .min ... .max), onlineSlot: PlayerSlot? = nil) {
         self.setup = setup
@@ -47,34 +54,64 @@ final class BattleEngine {
 
     /// Called once per display frame.
     func tick(_ date: Date) {
+        #if DEBUG
+        if isHeldForStoreDemo { return }
+        #endif
         guard !isPaused, !isIntroPlaying else { lastDate = nil; return }
         guard let last = lastDate else { lastDate = date; return }
         lastDate = date
 
-        var frame = min(max(0, date.timeIntervalSince(last)), GameConfig.maxFrameDelta)
-        // Presentation-only time warps; the simulation still advances in fixed steps.
-        if hitStop > 0 {
-            hitStop -= frame
-            frame = 0
-        } else if slowMotion > 0 {
-            slowMotion -= frame
-            frame *= Self.slowMotionRate
-        }
+        let delta = max(0, date.timeIntervalSince(last))
+        // Online, no time is dropped: a hitch or a trip to the background is caught up, so both devices
+        // stay at the same moment of the fight. Offline, a long frame is just clamped.
+        owed += onlineSlot == nil ? min(delta, GameConfig.maxFrameDelta) : delta
+
+        // Hit-stop and slow motion are counted per step rather than per frame, so they last exactly as
+        // long on every device whatever its frame rate.
         let dt = GameConfig.fixedTimeStep
-        accumulator += frame
-        while accumulator >= dt {
+        var budget = Self.maxCatchUpPerFrame
+        var events: [BattleEvent] = []
+        while budget > 0 {
+            if hitStop > 0 {
+                let frozen = min(hitStop, owed, budget)
+                hitStop -= frozen
+                owed -= frozen
+                budget -= frozen
+                if hitStop > 0 { break }
+                continue
+            }
+            let cost = stepCost
+            guard owed >= cost, budget >= cost else { break }
+            owed -= cost
+            budget -= cost
+            if slowMotion > 0 { slowMotion = max(0, slowMotion - cost) }
             simulation.step(dt: dt)
-            accumulator -= dt
+            lockLaunchIfDue()
+            let stepEvents = simulation.drainEvents()
+            startTimeWarps(for: stepEvents)
+            events += stepEvents
         }
-        interpolation = accumulator / dt
+        interpolation = hitStop > 0 ? 0 : min(1, owed / stepCost)
+        // No buzzing through a fast-forward.
+        if budget > Self.maxCatchUpPerFrame - GameConfig.maxFrameDelta { haptics.play(events) }
 
-        if let onlineSlot, simulation.isWaitingForLaunchLock, !simulation.lockedSlots.contains(onlineSlot) {
-            let angle = simulation.launchVelocities[onlineSlot.rawValue].angle
-            simulation.lockLaunch(onlineSlot, angle: angle)
-            onLaunchLocked?(angle)
+        if case .finished(let result) = simulation.phase,
+           simulation.timeSinceFinish >= GameConfig.resultsDelay,
+           !outcomeScheduled {
+            outcomeScheduled = true
+            // Publish outside the view update that called `tick`.
+            DispatchQueue.main.async { [weak self] in
+                withAnimation(.spring(duration: 0.4)) { self?.outcome = result }
+            }
         }
+    }
 
-        let events = simulation.drainEvents()
+    /// Real seconds one simulation step takes (longer during knockout slow motion).
+    private var stepCost: Double {
+        slowMotion > 0 ? GameConfig.fixedTimeStep / Self.slowMotionRate : GameConfig.fixedTimeStep
+    }
+
+    private func startTimeWarps(for events: [BattleEvent]) {
         for event in events {
             switch event {
             case .damage(let hit) where hit.amount >= Self.hitStopDamage:
@@ -86,17 +123,20 @@ final class BattleEngine {
                 break
             }
         }
-        haptics.play(events)
+    }
 
-        if case .finished(let result) = simulation.phase,
-           simulation.timeSinceFinish >= GameConfig.resultsDelay,
-           !outcomeScheduled {
-            outcomeScheduled = true
-            // Publish outside the view update that called `tick`.
-            DispatchQueue.main.async { [weak self] in
-                withAnimation(.spring(duration: 0.4)) { self?.outcome = result }
-            }
-        }
+    /// Online: lock this device's launch as its countdown runs out.
+    private func lockLaunchIfDue() {
+        if simulation.isWaitingForLaunchLock { lockLaunchNow() }
+    }
+
+    /// Online: fixes this device's launch direction now and tells the opponent. Also used when the app
+    /// leaves the screen mid-countdown, so the opponent isn't kept waiting for it.
+    func lockLaunchNow() {
+        guard let onlineSlot, simulation.phase == .countdown, !simulation.lockedSlots.contains(onlineSlot) else { return }
+        let angle = simulation.launchVelocities[onlineSlot.rawValue].angle
+        simulation.lockLaunch(onlineSlot, angle: angle)
+        onLaunchLocked?(angle)
     }
 
     var canPause: Bool { outcome == nil && !isIntroPlaying }
@@ -112,6 +152,21 @@ final class BattleEngine {
         lastDate = nil
     }
 }
+
+#if DEBUG
+extension BattleEngine {
+    /// App Store screenshots: plays the fight (without its intro) up to `time` seconds and holds it there.
+    func holdForStoreDemo(at time: Double) {
+        isIntroPlaying = false
+        let dt = GameConfig.fixedTimeStep
+        for _ in 0..<Int(time / dt) {
+            simulation.step(dt: dt)
+            _ = simulation.drainEvents()
+        }
+        isHeldForStoreDemo = true
+    }
+}
+#endif
 
 /// Light haptic feedback on hits (iPhone only; no-op elsewhere).
 private final class Haptics {
